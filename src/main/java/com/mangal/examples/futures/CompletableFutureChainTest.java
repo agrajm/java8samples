@@ -10,7 +10,7 @@ public class CompletableFutureChainTest {
     public static void main(String[] args){
         composingFuturesUsingThenCompose();
     }
-    
+
     private static void composingFuturesUsingThenCompose(){
 
         String userId = "userId";
