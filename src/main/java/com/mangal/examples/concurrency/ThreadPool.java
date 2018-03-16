@@ -18,7 +18,7 @@ public class ThreadPool {
     }
 
     private AtomicBoolean execute;
-    private ConcurrentLinkedQueue<Runnable> runnables;
+    private ConcurrentLinkedQueue<Task> runnables;
     private List<ThreadPoolWorker> workers;
     private int threadsCount;
 
@@ -36,16 +36,11 @@ public class ThreadPool {
         }
     }
 
-    public void executeTask(Runnable runnable){
+    public void executeTask(Task runnable){
         if(!this.execute.get()){
             throw new IllegalStateException("The threadpool has been stopped. Restart to submit task");
         }
         this.runnables.add(runnable);
-    }
-
-    public void shutdown(){
-        this.runnables.clear();
-        stop();
     }
 
     public void stop(){
@@ -53,54 +48,35 @@ public class ThreadPool {
     }
 
     public void awaitTermination(long timeout) throws TimeoutException{
-        if(this.execute.get()){
-            throw new IllegalStateException("Threadpool should be stopped before awaiting termination");
-        }
-        else{
-            long currentTime = System.currentTimeMillis();
-            while (System.currentTimeMillis() - currentTime < timeout){
-                boolean flag = true;
-                for (Thread worker: this.workers){
-                    if(worker.isAlive()){
-                        flag = false;
-                        break;
-                    }
-                }
-                if(flag){
-                    return;
-                }
-                try {
-                    Thread.sleep(1);
-                }catch (InterruptedException e){
-                    e.printStackTrace();
-                }
+        for (Thread worker: this.workers){
+            try {
+                worker.join(timeout);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
-            throw new TimeoutException("Unable to shutdown pool within specified time "+timeout);
         }
     }
 
     private class ThreadPoolWorker extends Thread{
 
         private AtomicBoolean execute;
-        private ConcurrentLinkedQueue<Runnable> runnables;
+        private ConcurrentLinkedQueue<Task> runnables;
 
-        public ThreadPoolWorker(AtomicBoolean execute, ConcurrentLinkedQueue<Runnable> runnables){
+        public ThreadPoolWorker(AtomicBoolean execute, ConcurrentLinkedQueue<Task> runnables){
             this.execute = execute;
             this.runnables = runnables;
         }
 
         @Override
         public void run(){
-            System.out.print("Inside Run of ThreadPoolWorker "+Thread.currentThread().getName());
-            while (this.execute.get() && !this.runnables.isEmpty()){
-                Runnable runnable;
-                while ((runnable = runnables.poll()) !=null ){
-                    System.out.print("Thread name "+Thread.currentThread().getName()+" executing ");
-                    runnable.run();
+            while (this.execute.get() || !this.runnables.isEmpty()){
+                Task task = runnables.poll();
+                if(task!=null){
+                    task.execute();
                 }
                 try {
                     // Simulate delay and avoid busy wait
-                    Thread.sleep(100);
+                    Thread.sleep(1);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
